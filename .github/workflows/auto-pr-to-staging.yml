@@ -1,0 +1,87 @@
+name: Auto PR to Staging
+
+on:
+  push:
+    branches:
+      - '**'
+      - '!main'
+      - '!staging'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  create-pr-to-staging:
+    runs-on: ubuntu-latest
+    if: github.ref != 'refs/heads/main' && github.ref != 'refs/heads/staging'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check if PR already exists
+        id: check-pr
+        run: |
+          BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          echo "branch-name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+
+          # Check if PR already exists from this branch to staging
+          EXISTING_PR=$(gh pr list --head "$BRANCH_NAME" --base staging --json number --jq '.[0].number // empty')
+          echo "existing-pr=$EXISTING_PR" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+
+      - name: Create Pull Request to Staging
+        if: steps.check-pr.outputs.existing-pr == ''
+        run: |
+          BRANCH_NAME="${{ steps.check-pr.outputs.branch-name }}"
+
+          # Create PR with default title and body
+          gh pr create \
+            --title "🚀 Auto PR: $BRANCH_NAME → staging" \
+            --body "## 🔄 Automatic Pull Request
+
+          This PR was automatically created from branch \`$BRANCH_NAME\` to \`staging\`.
+
+          ### 📋 Changes
+          - Branch: \`$BRANCH_NAME\`
+          - Target: \`staging\`
+          - Auto-generated: ✅
+
+          ### ⚡ Next Steps
+          1. Review the changes
+          2. Run tests if needed
+          3. Merge when ready
+
+          ---
+          *This PR was automatically created by GitHub Actions*" \
+            --base staging \
+            --head "$BRANCH_NAME"
+        env:
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+
+      - name: Add labels to PR
+        if: steps.check-pr.outputs.existing-pr == ''
+        run: |
+          BRANCH_NAME="${{ steps.check-pr.outputs.branch-name }}"
+
+          # Get the PR number
+          PR_NUMBER=$(gh pr list --head "$BRANCH_NAME" --base staging --json number --jq '.[0].number')
+
+          # Add labels based on branch name
+          if [[ "$BRANCH_NAME" =~ ^feat/ ]]; then
+            gh pr edit "$PR_NUMBER" --add-label "feature"
+          elif [[ "$BRANCH_NAME" =~ ^fix/ ]]; then
+            gh pr edit "$PR_NUMBER" --add-label "bugfix"
+          elif [[ "$BRANCH_NAME" =~ ^refactor/ ]]; then
+            gh pr edit "$PR_NUMBER" --add-label "refactor"
+          elif [[ "$BRANCH_NAME" =~ ^chore/ ]]; then
+            gh pr edit "$PR_NUMBER" --add-label "chore"
+          fi
+
+          gh pr edit "$PR_NUMBER" --add-label "auto-generated"
+        env:
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
