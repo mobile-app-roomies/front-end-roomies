@@ -1,0 +1,131 @@
+name: Auto PR Staging to Main
+
+on:
+  push:
+    branches:
+      - staging
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  create-pr-to-main:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check if PR already exists
+        id: check-pr
+        run: |
+          # Check if PR already exists from staging to main
+          EXISTING_PR=$(gh pr list --head staging --base main --json number --jq '.[0].number // empty')
+          echo "existing-pr=$EXISTING_PR" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get latest commits for PR body
+        id: get-commits
+        if: steps.check-pr.outputs.existing-pr == ''
+        run: |
+          # Get commits since last merge to main
+          COMMITS=$(gh api repos/${{ github.repository }}/compare/main...staging --jq '.commits[] | "- " + .commit.message' | head -10)
+          echo "commits<<EOF" >> $GITHUB_OUTPUT
+          echo "$COMMITS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+          # Get commit count
+          COMMIT_COUNT=$(gh api repos/${{ github.repository }}/compare/main...staging --jq '.commits | length')
+          echo "commit-count=$COMMIT_COUNT" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create Pull Request to Main
+        if: steps.check-pr.outputs.existing-pr == ''
+        run: |
+          COMMIT_COUNT="${{ steps.get-commits.outputs.commit-count }}"
+
+          gh pr create \
+            --title "🚀 Release: Staging → Main ($COMMIT_COUNT commits)" \
+            --body "## 📦 Release Pull Request
+
+          This PR contains the latest changes from \`staging\` ready for release to \`main\`.
+
+          ### 📊 Summary
+          - **Commits**: $COMMIT_COUNT
+          - **Source**: \`staging\`
+          - **Target**: \`main\`
+          - **Type**: Merge commit
+
+          ### 📋 Recent Changes
+          ${{ steps.get-commits.outputs.commits }}
+
+          ### ✅ Pre-merge Checklist
+          - [ ] All tests passing
+          - [ ] Code review completed
+          - [ ] Documentation updated
+          - [ ] Ready for production
+
+          ---
+          *This PR was automatically created from staging. Use **merge commit** to preserve history.*" \
+            --base main \
+            --head staging
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Add labels and assign reviewers
+        if: steps.check-pr.outputs.existing-pr == ''
+        run: |
+          # Get the PR number
+          PR_NUMBER=$(gh pr list --head staging --base main --json number --jq '.[0].number')
+
+          # Add release labels
+          gh pr edit "$PR_NUMBER" --add-label "release"
+          gh pr edit "$PR_NUMBER" --add-label "auto-generated"
+          gh pr edit "$PR_NUMBER" --add-label "staging-to-main"
+
+          # Set as ready for review
+          gh pr ready "$PR_NUMBER" || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update existing PR
+        if: steps.check-pr.outputs.existing-pr != ''
+        run: |
+          PR_NUMBER="${{ steps.check-pr.outputs.existing-pr }}"
+
+          echo "Existing PR #$PR_NUMBER found. Updating description..."
+
+          # Update PR body with latest commits
+          COMMIT_COUNT=$(gh api repos/${{ github.repository }}/compare/main...staging --jq '.commits | length')
+          COMMITS=$(gh api repos/${{ github.repository }}/compare/main...staging --jq '.commits[] | "- " + .commit.message' | head -10)
+
+          gh pr edit "$PR_NUMBER" \
+            --title "🚀 Release: Staging → Main ($COMMIT_COUNT commits)" \
+            --body "## 📦 Release Pull Request
+
+          This PR contains the latest changes from \`staging\` ready for release to \`main\`.
+
+          ### 📊 Summary
+          - **Commits**: $COMMIT_COUNT
+          - **Source**: \`staging\`
+          - **Target**: \`main\`
+          - **Type**: Merge commit
+
+          ### 📋 Recent Changes
+          $COMMITS
+
+          ### ✅ Pre-merge Checklist
+          - [ ] All tests passing
+          - [ ] Code review completed
+          - [ ] Documentation updated
+          - [ ] Ready for production
+
+          ---
+          *This PR was automatically updated. Use **merge commit** to preserve history.*"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
