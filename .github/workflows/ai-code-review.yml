@@ -78,9 +78,12 @@ jobs:
               file.messages.filter(msg => msg.severity === 2)
             ).slice(0, 5);
 
-            // Call OpenAI API for advanced review
+            // Call OpenAI API for advanced review (only for PRs to main)
             let aiReview = '';
-            if (process.env.OPENAI_API_KEY && prDiff.length > 0) {
+            const targetBranch = context.payload.pull_request.base.ref;
+            const useAI = targetBranch === 'main' && process.env.OPENAI_API_KEY && prDiff.length > 0;
+
+            if (useAI) {
               try {
                 const response = await fetch('https://api.openai.com/v1/chat/completions', {
                   method: 'POST',
@@ -120,10 +123,18 @@ jobs:
             }
 
             // Create comprehensive review comment
+            const aiStatus = targetBranch === 'main' ?
+              (aiReview ? '✅ Complétée' : '⚠️ Limitée/Indisponible') :
+              '💰 Désactivée (économie de coûts)';
+
             const reviewComment = `## 🤖 Review IA Automatique
 
             ${aiReview ? `### 🧠 Analyse IA (GPT-4)
             ${aiReview}
+
+            ` : targetBranch !== 'main' ? `### 💰 Économie d'API
+            L'analyse IA OpenAI est limitée aux PRs vers \`main\` pour optimiser les coûts.
+            Cette PR vers \`${targetBranch}\` utilise uniquement l'analyse statique.
 
             ` : ''}### 📊 Analyse Statique
 
@@ -140,7 +151,7 @@ jobs:
             ### 📱 Checklist React Native/Expo
             - ✅ Compilation TypeScript vérifiée
             - ✅ Règles ESLint appliquées
-            - ${aiReview ? '✅' : '⚠️'} Analyse IA ${aiReview ? 'complétée' : 'limitée'}
+            - ${aiStatus} Analyse IA (${targetBranch === 'main' ? 'activée pour main' : 'économisée pour ' + targetBranch})
 
             ### 🔗 Ressources
             - [Documentation Expo](https://docs.expo.dev/)
