@@ -32,7 +32,7 @@ jobs:
           EXISTING_PR=$(gh pr list --head "$BRANCH_NAME" --base staging --json number --jq '.[0].number // empty')
           echo "existing-pr=$EXISTING_PR" >> $GITHUB_OUTPUT
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
 
       - name: Create Pull Request to Staging
         if: steps.check-pr.outputs.existing-pr == ''
@@ -61,7 +61,7 @@ jobs:
             --base staging \
             --head "$BRANCH_NAME"
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
 
       - name: Add labels to PR
         if: steps.check-pr.outputs.existing-pr == ''
@@ -84,4 +84,4 @@ jobs:
 
           gh pr edit "$PR_NUMBER" --add-label "auto-generated"
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
