@@ -5,10 +5,10 @@ import { Text, View, Button, Spacer } from '@/components/atoms';
 export default function ModalScreen() {
   return (
     <View style={styles.container}>
-      <Text variant="title" weight="bold">This is a modal</Text>
+      <Text variant="title" weight="bold">Modal superCours</Text>
       <Spacer size="lg" />
       <Link href="/" dismissTo asChild>
-        <Button title="Go to home screen" variant="primary" />
+        <Button title="Retour à l'accueil" variant="primary" />
       </Link>
     </View>
   );
@@ -20,9 +20,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 20,
-  },
-  link: {
-    marginTop: 15,
-    paddingVertical: 15,
   },
 });
