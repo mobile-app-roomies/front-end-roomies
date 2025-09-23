@@ -1,0 +1,17 @@
+# Global owners - these users will be requested for review on every PR
+* @anthonymn1
+
+# Specific file patterns
+/app/ @anthonymn1
+/components/ @anthonymn1
+/.github/ @anthonymn1
+
+# Configuration files
+package.json @anthonymn1
+app.json @anthonymn1
+expo.json @anthonymn1
+tsconfig.json @anthonymn1
+eslint.config.js @anthonymn1
+
+# CI/CD workflows
+/.github/workflows/ @anthonymn1
