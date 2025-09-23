@@ -1,10 +1,9 @@
-import { useState, useEffect, createContext, useContext } from 'react';
 import { Session } from '@supabase/supabase-js';
-import * as WebBrowser from 'expo-web-browser';
-import * as Linking from 'expo-linking';
 import * as SecureStore from 'expo-secure-store';
-import { supabase, User } from '../lib/supabase';
+import * as WebBrowser from 'expo-web-browser';
+import { createContext, useContext, useEffect, useState } from 'react';
 import { createAuthRedirectUrl } from '../lib/linking';
+import { supabase, User } from '../lib/supabase';
 
 // Complete WebBrowser authentication for Expo
 WebBrowser.maybeCompleteAuthSession();

@@ -1,11 +1,11 @@
-import { Tabs, Redirect } from 'expo-router';
-import React from 'react';
 import { IconSymbol } from '@/components/atoms/IconSymbol';
 import { HapticTab } from '@/components/molecules/HapticTab';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuth } from '@/hooks/useAuth';
-import { View, Text, ActivityIndicator } from 'react-native';
+import { Redirect, Tabs } from 'expo-router';
+import React from 'react';
+import { ActivityIndicator, Text, View } from 'react-native';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();

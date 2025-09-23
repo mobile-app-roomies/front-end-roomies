@@ -1,6 +1,6 @@
-import { StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { Text, View } from '@/components/atoms';
 import { useAuth } from '@/hooks/useAuth';
+import { Alert, StyleSheet, TouchableOpacity } from 'react-native';
 
 export default function HomeScreen() {
   const { user, signOut } = useAuth();
