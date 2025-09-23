@@ -1,12 +1,30 @@
-import { Tabs } from 'expo-router';
-import React from 'react';
 import { IconSymbol } from '@/components/atoms/IconSymbol';
 import { HapticTab } from '@/components/molecules/HapticTab';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useAuth } from '@/hooks/useAuth';
+import { Redirect, Tabs } from 'expo-router';
+import React from 'react';
+import { ActivityIndicator, Text, View } from 'react-native';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
+  const { session, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color={Colors[colorScheme ?? 'light'].tint} />
+        <Text style={{ marginTop: 16, color: Colors[colorScheme ?? 'light'].text }}>
+          Loading...
+        </Text>
+      </View>
+    );
+  }
+
+  if (!session) {
+    return <Redirect href="/auth" />;
+  }
 
   return (
     <Tabs
