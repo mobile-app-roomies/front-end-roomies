@@ -1,5 +1,5 @@
 import { Text, View } from '@/components/atoms';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/contexts/AuthContext';
 import { Alert, StyleSheet, TouchableOpacity } from 'react-native';
 
 export default function HomeScreen() {
@@ -26,9 +26,8 @@ export default function HomeScreen() {
 
       {user && (
         <View style={styles.userInfo}>
-          <Text variant="subtitle">Hello, {user.name}!</Text>
+          <Text variant="subtitle">Hello, {user.email?.split('@')[0]}!</Text>
           <Text>Email: {user.email}</Text>
-          <Text>Provider: {user.provider}</Text>
         </View>
       )}
 

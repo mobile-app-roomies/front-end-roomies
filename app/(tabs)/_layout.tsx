@@ -2,7 +2,7 @@ import { IconSymbol } from '@/components/atoms/IconSymbol';
 import { HapticTab } from '@/components/molecules/HapticTab';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/contexts/AuthContext';
 import { Redirect, Tabs } from 'expo-router';
 import React from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
