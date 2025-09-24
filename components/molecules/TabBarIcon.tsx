@@ -9,11 +9,5 @@ export function TabBarIcon({ focused = false, ...rest }: TabBarIconProps) {
   const focusedColor = useThemeColor({}, 'tint');
   const unfocusedColor = useThemeColor({}, 'tabIconDefault');
 
-  return (
-    <Icon
-      {...rest}
-      size={28}
-      color={focused ? focusedColor : unfocusedColor}
-    />
-  );
+  return <Icon {...rest} size={28} color={focused ? focusedColor : unfocusedColor} />;
 }

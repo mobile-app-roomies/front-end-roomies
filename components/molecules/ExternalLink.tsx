@@ -9,12 +9,7 @@ export type ExternalLinkProps = Omit<TextProps, 'onPress'> & {
   children: React.ReactNode;
 };
 
-export function ExternalLink({
-  href,
-  asChild = false,
-  children,
-  ...rest
-}: ExternalLinkProps) {
+export function ExternalLink({ href, asChild = false, children, ...rest }: ExternalLinkProps) {
   const handlePress = async () => {
     if (Platform.OS !== 'web') {
       await WebBrowser.openBrowserAsync(href);
