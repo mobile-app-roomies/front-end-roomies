@@ -38,8 +38,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     async function getInitialSession() {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
         if (mounted) {
           setSession(session);
           if (session?.user) {
@@ -60,20 +62,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     getInitialSession();
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('Auth state change:', event, session?.user?.email);
-        if (mounted) {
-          setSession(session);
-          if (session?.user) {
-            await fetchUserProfile(session.user.id);
-          } else {
-            setUser(null);
-          }
-          setIsLoading(false);
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state change:', event, session?.user?.email);
+      if (mounted) {
+        setSession(session);
+        if (session?.user) {
+          await fetchUserProfile(session.user.id);
+        } else {
+          setUser(null);
         }
+        setIsLoading(false);
       }
-    );
+    });
 
     return () => {
       mounted = false;
@@ -83,11 +85,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchUserProfile = async (userId: string) => {
     try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', userId)
-        .single();
+      const { data, error } = await supabase.from('users').select('*').eq('id', userId).single();
 
       if (error) throw error;
       setUser(data);
@@ -116,10 +114,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('Opening OAuth URL:', data.url);
 
       // Open the OAuth URL in the browser
-      const result = await WebBrowser.openAuthSessionAsync(
-        data.url,
-        redirectTo
-      );
+      const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
 
       console.log('OAuth result:', result);
 
@@ -156,10 +151,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('Opening OAuth URL:', data.url);
 
       // Open the OAuth URL in the browser
-      const result = await WebBrowser.openAuthSessionAsync(
-        data.url,
-        redirectTo
-      );
+      const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
 
       console.log('OAuth result:', result);
 
@@ -235,7 +227,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       setSession(null);
       setUser(null);
-      
+
       // Clear any stored tokens
       await SecureStore.deleteItemAsync('supabase.auth.token');
     } catch (error) {
@@ -262,11 +254,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     clearError,
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {

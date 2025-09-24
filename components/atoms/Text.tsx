@@ -20,13 +20,7 @@ export function Text({
 
   return (
     <RNText
-      style={[
-        { color },
-        styles.base,
-        styles[variant],
-        weightStyles[weight],
-        style,
-      ]}
+      style={[{ color }, styles.base, styles[variant], weightStyles[weight], style]}
       {...rest}
     />
   );

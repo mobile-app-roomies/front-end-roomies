@@ -10,26 +10,11 @@ export type CardProps = {
   padded?: boolean;
 };
 
-export function Card({
-  title,
-  subtitle,
-  children,
-  style,
-  padded = true,
-}: CardProps) {
-  const borderColor = useThemeColor(
-    { light: '#e5e5e5', dark: '#404040' },
-    'border'
-  );
+export function Card({ title, subtitle, children, style, padded = true }: CardProps) {
+  const borderColor = useThemeColor({ light: '#e5e5e5', dark: '#404040' }, 'border');
 
   return (
-    <View
-      style={[
-        styles.container,
-        { borderColor },
-        padded && styles.padded,
-        style,
-      ]}>
+    <View style={[styles.container, { borderColor }, padded && styles.padded, style]}>
       {(title || subtitle) && (
         <>
           {title && (

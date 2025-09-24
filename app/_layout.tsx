@@ -30,9 +30,9 @@ export default function RootLayout() {
     };
 
     handleInitialURL();
-    
+
     const subscription = Linking.addEventListener('url', handleDeepLink);
-    
+
     return () => subscription?.remove();
   }, []);
 

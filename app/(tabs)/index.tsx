@@ -6,26 +6,24 @@ export default function HomeScreen() {
   const { user, signOut } = useAuth();
 
   const handleSignOut = async () => {
-    Alert.alert(
-      'Sign Out',
-      'Are you sure you want to sign out?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Sign Out', 
-          style: 'destructive',
-          onPress: signOut 
-        },
-      ]
-    );
+    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Sign Out',
+        style: 'destructive',
+        onPress: signOut,
+      },
+    ]);
   };
 
   return (
     <View style={styles.container}>
       <View style={styles.titleContainer}>
-        <Text variant="title" weight="bold">Welcome to Roomies! 🏠</Text>
+        <Text variant="title" weight="bold">
+          Welcome to Roomies! 🏠
+        </Text>
       </View>
-      
+
       {user && (
         <View style={styles.userInfo}>
           <Text variant="subtitle">Hello, {user.name}!</Text>

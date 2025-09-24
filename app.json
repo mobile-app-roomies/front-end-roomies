@@ -36,11 +36,8 @@
           "autoVerify": true,
           "data": [
             {
-              "scheme": "https",
-              "host": "*.supabase.co"
-            },
-            {
-              "scheme": "com.roomies.app"
+              "scheme": "com.roomies.app",
+              "pathPrefix": "/auth"
             }
           ],
           "category": ["BROWSABLE", "DEFAULT"]

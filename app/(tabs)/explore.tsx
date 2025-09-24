@@ -5,7 +5,9 @@ export default function ExploreScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.titleContainer}>
-        <Text variant="title" weight="bold">Explorer</Text>
+        <Text variant="title" weight="bold">
+          Explorer
+        </Text>
       </View>
       <Text>Explorez les fonctionnalités de superCours</Text>
     </View>

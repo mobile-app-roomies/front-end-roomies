@@ -11,18 +11,8 @@ export type ListItemProps = {
   style?: ViewStyle;
 };
 
-export function ListItem({
-  title,
-  subtitle,
-  leftIcon,
-  rightIcon,
-  onPress,
-  style,
-}: ListItemProps) {
-  const borderColor = useThemeColor(
-    { light: '#e5e5e5', dark: '#404040' },
-    'border'
-  );
+export function ListItem({ title, subtitle, leftIcon, rightIcon, onPress, style }: ListItemProps) {
+  const borderColor = useThemeColor({ light: '#e5e5e5', dark: '#404040' }, 'border');
 
   const content = (
     <View style={[styles.container, { borderColor }, style]}>
@@ -53,9 +43,7 @@ export function ListItem({
 
   if (onPress) {
     return (
-      <Pressable
-        onPress={onPress}
-        style={({ pressed }) => pressed && styles.pressed}>
+      <Pressable onPress={onPress} style={({ pressed }) => pressed && styles.pressed}>
         {content}
       </Pressable>
     );

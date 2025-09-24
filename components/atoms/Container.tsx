@@ -40,17 +40,15 @@ export function Container({
       <ScrollView
         style={containerStyle}
         showsVerticalScrollIndicator={false}
-        showsHorizontalScrollIndicator={false}>
+        showsHorizontalScrollIndicator={false}
+      >
         {children}
       </ScrollView>
     );
   }
 
   return (
-    <View
-      style={containerStyle}
-      lightColor={lightColor}
-      darkColor={darkColor}>
+    <View style={containerStyle} lightColor={lightColor} darkColor={darkColor}>
       {children}
     </View>
   );
