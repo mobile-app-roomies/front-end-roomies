@@ -34,7 +34,6 @@ export function Button({
     'tint'
   );
 
-
   const getButtonStyle = (): ViewStyle[] => {
     const baseStyle: ViewStyle[] = [styles.base, sizeStyles[size]];
 
@@ -75,15 +74,12 @@ export function Button({
         style,
       ]}
       disabled={disabled}
-      {...rest}>
+      {...rest}
+    >
       <Text
-        style={[
-          styles.text,
-          sizeTextStyles[size],
-          { color: getTextColor() },
-          textStyle,
-        ]}
-        weight="semibold">
+        style={[styles.text, sizeTextStyles[size], { color: getTextColor() }, textStyle]}
+        weight="semibold"
+      >
         {title}
       </Text>
     </Pressable>

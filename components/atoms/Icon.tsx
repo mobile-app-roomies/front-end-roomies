@@ -21,10 +21,7 @@ export function Icon({
   lightColor,
   darkColor,
 }: IconProps) {
-  const themeColor = useThemeColor(
-    { light: lightColor, dark: darkColor },
-    'icon'
-  );
+  const themeColor = useThemeColor({ light: lightColor, dark: darkColor }, 'icon');
 
   const finalColor = color || themeColor;
 

@@ -6,16 +6,8 @@ export type ViewProps = RNViewProps & {
   darkColor?: string;
 };
 
-export function View({
-  style,
-  lightColor,
-  darkColor,
-  ...rest
-}: ViewProps) {
-  const backgroundColor = useThemeColor(
-    { light: lightColor, dark: darkColor },
-    'background'
-  );
+export function View({ style, lightColor, darkColor, ...rest }: ViewProps) {
+  const backgroundColor = useThemeColor({ light: lightColor, dark: darkColor }, 'background');
 
   return <RNView style={[{ backgroundColor }, style]} {...rest} />;
 }

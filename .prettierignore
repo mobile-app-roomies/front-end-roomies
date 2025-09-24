@@ -1,0 +1,21 @@
+# Ignore artifacts
+node_modules
+.expo
+.expo-shared
+dist
+build
+coverage
+web-build
+
+# Ignore all HTML files
+*.html
+
+# Ignore generated files
+*.generated.*
+
+# Ignore markdown files
+*.md
+
+# Ignore configuration files
+package-lock.json
+yarn.lock

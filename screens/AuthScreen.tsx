@@ -1,15 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors } from '../constants/theme';
@@ -26,16 +26,16 @@ interface HouseFormData {
 
 export default function AuthScreen() {
   const colorScheme = useColorScheme();
-  const { 
-    signInWithGoogle, 
-    signInWithGitHub, 
-    signInWithEmail, 
-    signUpWithEmail, 
-    isLoading, 
+  const {
+    signInWithGoogle,
+    signInWithGitHub,
+    signInWithEmail,
+    signUpWithEmail,
+    isLoading,
     error,
-    clearError 
+    clearError,
   } = useAuth();
-  
+
   const [authMode, setAuthMode] = useState<AuthMode>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -86,12 +86,11 @@ export default function AuthScreen() {
       <Text style={[styles.title, { color: textColor }]}>
         {authMode === 'signup' ? 'Create Account' : 'Welcome Back'}
       </Text>
-      
+
       <Text style={[styles.subtitle, { color: mutedColor }]}>
-        {authMode === 'signup' 
-          ? 'Join your roommates in managing chores' 
-          : 'Sign in to continue managing chores'
-        }
+        {authMode === 'signup'
+          ? 'Join your roommates in managing chores'
+          : 'Sign in to continue managing chores'}
       </Text>
 
       {/* OAuth Buttons */}
@@ -102,9 +101,7 @@ export default function AuthScreen() {
           disabled={isLoading}
         >
           <Ionicons name="logo-google" size={20} color="white" />
-          <Text style={styles.oauthButtonText}>
-            Continue with Google
-          </Text>
+          <Text style={styles.oauthButtonText}>Continue with Google</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -113,9 +110,7 @@ export default function AuthScreen() {
           disabled={isLoading}
         >
           <Ionicons name="logo-github" size={20} color="white" />
-          <Text style={styles.oauthButtonText}>
-            Continue with GitHub
-          </Text>
+          <Text style={styles.oauthButtonText}>Continue with GitHub</Text>
         </TouchableOpacity>
       </View>
 
@@ -138,7 +133,7 @@ export default function AuthScreen() {
             autoCapitalize="words"
           />
         )}
-        
+
         <TextInput
           style={[styles.input, { color: textColor, borderColor: mutedColor }]}
           placeholder="Email"
@@ -149,7 +144,7 @@ export default function AuthScreen() {
           autoCapitalize="none"
           autoCorrect={false}
         />
-        
+
         <TextInput
           style={[styles.input, { color: textColor, borderColor: mutedColor }]}
           placeholder="Password"
@@ -178,10 +173,7 @@ export default function AuthScreen() {
         onPress={() => setAuthMode(authMode === 'signin' ? 'signup' : 'signin')}
       >
         <Text style={[styles.switchText, { color: mutedColor }]}>
-          {authMode === 'signup' 
-            ? "Already have an account? " 
-            : "Don't have an account? "
-          }
+          {authMode === 'signup' ? 'Already have an account? ' : "Don't have an account? "}
           <Text style={[styles.switchLink, { color: Colors[colorScheme ?? 'light'].tint }]}>
             {authMode === 'signup' ? 'Sign In' : 'Sign Up'}
           </Text>
@@ -199,10 +191,8 @@ export default function AuthScreen() {
 
   const renderHouseForm = () => (
     <View style={styles.formContainer}>
-      <Text style={[styles.title, { color: textColor }]}>
-        Welcome! 🏠
-      </Text>
-      
+      <Text style={[styles.title, { color: textColor }]}>Welcome! 🏠</Text>
+
       <Text style={[styles.subtitle, { color: mutedColor }]}>
         Let&apos;s get you set up with a house
       </Text>
@@ -213,19 +203,24 @@ export default function AuthScreen() {
           style={[
             styles.houseActionButton,
             houseForm.action === 'create' && styles.houseActionButtonActive,
-            { borderColor: mutedColor }
+            { borderColor: mutedColor },
           ]}
           onPress={() => setHouseForm({ action: 'create' })}
         >
-          <Ionicons 
-            name="home" 
-            size={24} 
-            color={houseForm.action === 'create' ? Colors[colorScheme ?? 'light'].tint : mutedColor} 
+          <Ionicons
+            name="home"
+            size={24}
+            color={houseForm.action === 'create' ? Colors[colorScheme ?? 'light'].tint : mutedColor}
           />
-          <Text style={[
-            styles.houseActionText,
-            { color: houseForm.action === 'create' ? Colors[colorScheme ?? 'light'].tint : mutedColor }
-          ]}>
+          <Text
+            style={[
+              styles.houseActionText,
+              {
+                color:
+                  houseForm.action === 'create' ? Colors[colorScheme ?? 'light'].tint : mutedColor,
+              },
+            ]}
+          >
             Create House
           </Text>
         </TouchableOpacity>
@@ -234,19 +229,24 @@ export default function AuthScreen() {
           style={[
             styles.houseActionButton,
             houseForm.action === 'join' && styles.houseActionButtonActive,
-            { borderColor: mutedColor }
+            { borderColor: mutedColor },
           ]}
           onPress={() => setHouseForm({ action: 'join' })}
         >
-          <Ionicons 
-            name="people" 
-            size={24} 
-            color={houseForm.action === 'join' ? Colors[colorScheme ?? 'light'].tint : mutedColor} 
+          <Ionicons
+            name="people"
+            size={24}
+            color={houseForm.action === 'join' ? Colors[colorScheme ?? 'light'].tint : mutedColor}
           />
-          <Text style={[
-            styles.houseActionText,
-            { color: houseForm.action === 'join' ? Colors[colorScheme ?? 'light'].tint : mutedColor }
-          ]}>
+          <Text
+            style={[
+              styles.houseActionText,
+              {
+                color:
+                  houseForm.action === 'join' ? Colors[colorScheme ?? 'light'].tint : mutedColor,
+              },
+            ]}
+          >
             Join House
           </Text>
         </TouchableOpacity>
@@ -260,7 +260,7 @@ export default function AuthScreen() {
             placeholder="House Name (e.g., 'The Cool Roomies')"
             placeholderTextColor={mutedColor}
             value={houseForm.houseName || ''}
-            onChangeText={(text) => setHouseForm(prev => ({ ...prev, houseName: text }))}
+            onChangeText={text => setHouseForm(prev => ({ ...prev, houseName: text }))}
             autoCapitalize="words"
           />
         ) : (
@@ -269,7 +269,7 @@ export default function AuthScreen() {
             placeholder="Invite Code"
             placeholderTextColor={mutedColor}
             value={houseForm.inviteCode || ''}
-            onChangeText={(text) => setHouseForm(prev => ({ ...prev, inviteCode: text }))}
+            onChangeText={text => setHouseForm(prev => ({ ...prev, inviteCode: text }))}
             autoCapitalize="characters"
             autoCorrect={false}
           />
@@ -297,7 +297,7 @@ export default function AuthScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardAvoid}
       >
-        <ScrollView 
+        <ScrollView
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >

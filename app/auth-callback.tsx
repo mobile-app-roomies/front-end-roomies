@@ -34,9 +34,9 @@ export default function AuthCallback() {
           const queryString = Object.keys(params)
             .map(key => `${key}=${params[key]}`)
             .join('&');
-          url = `com.roomies.app://auth-callback?${queryString}`;
+          url = `com.roomies.app://auth/callback?${queryString}`;
         }
-        
+
         if (!url) {
           console.error('No URL found in auth callback');
           router.replace('/auth');
@@ -47,7 +47,10 @@ export default function AuthCallback() {
 
         // Parse the auth tokens from the URL
         const authParams = parseAuthUrl(url);
-        console.log('Parsed auth params:', { ...authParams, access_token: authParams.access_token ? '[REDACTED]' : undefined });
+        console.log('Parsed auth params:', {
+          ...authParams,
+          access_token: authParams.access_token ? '[REDACTED]' : undefined,
+        });
 
         if (authParams.error) {
           console.error('Auth error:', authParams.error, authParams.error_description);
@@ -57,7 +60,7 @@ export default function AuthCallback() {
 
         if (authParams.access_token) {
           console.log('Setting session with tokens...');
-          
+
           // Set the session in Supabase
           const { data, error } = await supabase.auth.setSession({
             access_token: authParams.access_token,
@@ -71,7 +74,7 @@ export default function AuthCallback() {
           }
 
           console.log('Session set successfully:', data.session?.user?.email);
-          
+
           // Navigate to the main app
           router.replace('/(tabs)');
         } else {
@@ -94,7 +97,9 @@ export default function AuthCallback() {
       <ActivityIndicator size="large" color="#007AFF" />
       <Text style={styles.text}>Completing sign in...</Text>
       <Text style={styles.debugText}>
-        {Object.keys(params).length > 0 ? 'Processing authentication...' : 'Waiting for auth data...'}
+        {Object.keys(params).length > 0
+          ? 'Processing authentication...'
+          : 'Waiting for auth data...'}
       </Text>
     </View>
   );
