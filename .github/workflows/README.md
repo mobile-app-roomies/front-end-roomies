@@ -6,8 +6,7 @@ Ce dossier contient tous les workflows automatisés du projet.
 
 | Workflow | Fichier | Déclencheur | Description |
 |----------|---------|-------------|-------------|
-| 🔵 **AI Review Light** | `ai-review-light.yml` | PRs → `staging` | Review IA légère (GPT-4o-mini) |
-| 🔴 **AI Review Deep** | `ai-review-deep.yml` | PRs → `main` | Review IA approfondie (GPT-4o) |
+| 🤖 **AI Code Review** | `ai-code-review.yml` | PRs → `main` | Review IA approfondie (GPT-4o) |
 | ✅ **Code Quality** | `code-quality.yml` | PRs + Push | ESLint, Prettier, TypeScript, Tests |
 | 📊 **SonarCloud** | `sonarcloud.yml` | Push → `main`/`staging` | Analyse de qualité + couverture |
 | 🔄 **Auto PR to Staging** | `auto-pr-to-staging.yml` | Push branches | PR automatique vers staging |
@@ -15,36 +14,12 @@ Ce dossier contient tous les workflows automatisés du projet.
 
 ---
 
-## 🔵 AI Review Light (Staging)
+## 🤖 AI Code Review
 
-**Fichier:** `ai-review-light.yml`
-
-### Déclenchement
-- Pull Requests vers `staging`
-- Types: opened, synchronize, reopened
-
-### Fonctionnalités
-- ✅ Analyse ESLint
-- ✅ Vérification TypeScript
-- ✅ Review IA légère (GPT-4o-mini)
-- ✅ Historique des 25 derniers commits
-- ✅ Labels automatiques
-
-### Coût
-~$0.001-0.01 par review
-
-### Secret requis
-- `OPENAI_API_KEY`
-- `TOKEN_GITHUB`
-
----
-
-## 🔴 AI Review Deep (Main)
-
-**Fichier:** `ai-review-deep.yml`
+**Fichier:** `ai-code-review.yml`
 
 ### Déclenchement
-- Pull Requests vers `main`
+- Pull Requests vers `main` uniquement
 - Seulement sur fichiers importants (app, components, contexts, hooks, lib, constants)
 
 ### Fonctionnalités
@@ -52,14 +27,16 @@ Ce dossier contient tous les workflows automatisés du projet.
 - ✅ Analyse des commits de la PR
 - ✅ Suivi détaillé des coûts
 - ✅ Filtrage intelligent par fichiers
-- ✅ Labels basés sur l'analyse
+- ✅ Labels automatiques basés sur l'analyse
+- ✅ Suggestions de code et best practices
+- ✅ Détection de bugs et problèmes de sécurité
 
 ### Coût
 ~$0.01-0.30 par review
 
-### Secret requis
-- `OPENAI_API_KEY`
-- `TOKEN_GITHUB`
+### Secrets requis
+- `OPENAI_API_KEY` - Clé API OpenAI
+- `TOKEN_GITHUB` - Personal Access Token GitHub
 
 ---
 
@@ -163,10 +140,9 @@ Configurez ces secrets dans **Settings** → **Secrets and variables** → **Act
 
 ### Estimation mensuelle
 
-Avec ~50 PRs/mois :
-- Staging (40 PRs) : ~$0.20
-- Main (10 PRs) : ~$1.50
-- **Total : ~$1.70/mois**
+Avec ~10 PRs vers main/mois :
+- AI Review (10 PRs) : ~$1.50
+- **Total : ~$1.50/mois**
 
 ---
 
@@ -180,14 +156,14 @@ Feature branch
     │
     ↓ PR créée automatiquement
     │
-staging (🔵 AI Review Light)
+staging (✅ Code Quality)
     ↓
     ├─→ Merge
     │   └─→ Auto PR Staging → Main
     │
     ↓ PR créée automatiquement
     │
-main (🔴 AI Review Deep + 📊 SonarCloud)
+main (🤖 AI Review + 📊 SonarCloud)
     ↓
 Production
 ```
@@ -226,9 +202,9 @@ npm run test:coverage
 
 ## 📚 Documentation
 
-- [AI Review Light](./../OPENAI-REVIEW.md)
 - [SonarCloud](./../SONARCLOUD.md)
 - [GitHub Actions](https://docs.github.com/en/actions)
+- [OpenAI API](https://platform.openai.com/docs)
 
 ---
 
