@@ -14,7 +14,13 @@ permissions:
 jobs:
   create-pr-to-staging:
     runs-on: ubuntu-latest
-    if: github.ref != 'refs/heads/main' && github.ref != 'refs/heads/staging'
+    # Ne pas exécuter sur main, staging, ou si c'est un merge commit
+    if: |
+      github.ref != 'refs/heads/main' && 
+      github.ref != 'refs/heads/staging' &&
+      !contains(github.event.head_commit.message, 'Merge pull request') &&
+      !contains(github.event.head_commit.message, 'staging') &&
+      github.event.head_commit.author.name != 'GitHub'
 
     steps:
       - name: Checkout code
