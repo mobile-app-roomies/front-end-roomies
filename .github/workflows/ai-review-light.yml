@@ -1,9 +1,9 @@
-name: AI Code Review
+name: 🔵 AI Review Light (Staging)
 
 on:
   pull_request:
     types: [opened, synchronize, reopened]
-    branches: [staging, main]
+    branches: [staging] # Light review for staging only (skip main)
 
 permissions:
   contents: read
@@ -45,6 +45,34 @@ jobs:
         run: |
           git diff origin/${{ github.event.pull_request.base.ref }}...HEAD > pr-diff.txt
 
+      - name: Get Recent Commit History
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.TOKEN_GITHUB }}
+          script: |
+            const fs = require('fs');
+
+            // Récupérer les 25 derniers commits
+            const commits = await github.rest.repos.listCommits({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 25
+            });
+
+            // Formater l'historique
+            const commitHistory = commits.data.map(commit => ({
+              sha: commit.sha.substring(0, 7),
+              author: commit.commit.author.name,
+              date: commit.commit.author.date,
+              message: commit.commit.message.split('\n')[0],
+              url: commit.html_url
+            }));
+
+            // Sauvegarder dans un fichier
+            fs.writeFileSync('commit-history.json', JSON.stringify(commitHistory, null, 2));
+
+            console.log(`✅ Récupéré ${commitHistory.length} commits`);
+
       - name: Generate AI Code Review
         uses: actions/github-script@v7
         with:
@@ -56,6 +84,7 @@ jobs:
             let prDiff = '';
             let eslintResults = [];
             let tsErrors = '';
+            let commitHistory = [];
 
             try {
               prDiff = fs.readFileSync('pr-diff.txt', 'utf8');
@@ -64,6 +93,9 @@ jobs:
               }
               if (fs.existsSync('typescript-results.txt')) {
                 tsErrors = fs.readFileSync('typescript-results.txt', 'utf8');
+              }
+              if (fs.existsSync('commit-history.json')) {
+                commitHistory = JSON.parse(fs.readFileSync('commit-history.json', 'utf8'));
               }
             } catch (error) {
               console.log('Error reading files:', error.message);
@@ -78,10 +110,10 @@ jobs:
               file.messages.filter(msg => msg.severity === 2)
             ).slice(0, 5);
 
-            // Call OpenAI API for advanced review (only for PRs to main)
+            // Call OpenAI API for light review (staging only)
             let aiReview = '';
             const targetBranch = context.payload.pull_request.base.ref;
-            const useAI = targetBranch === 'main' && process.env.OPENAI_API_KEY && prDiff.length > 0;
+            const useAI = process.env.OPENAI_API_KEY && prDiff.length > 0;
 
             if (useAI) {
               try {
@@ -123,18 +155,12 @@ jobs:
             }
 
             // Create comprehensive review comment
-            const aiStatus = targetBranch === 'main' ?
-              (aiReview ? '✅ Complétée' : '⚠️ Limitée/Indisponible') :
-              '💰 Désactivée (économie de coûts)';
+            const aiStatus = aiReview ? '✅ Complétée' : '⚠️ Limitée/Indisponible';
 
-            const reviewComment = `## 🤖 Review IA Automatique
+            const reviewComment = `## 🤖 Review IA Automatique (Légère)
 
-            ${aiReview ? `### 🧠 Analyse IA (GPT-4)
+            ${aiReview ? `### 🧠 Analyse IA (GPT-4o-mini)
             ${aiReview}
-
-            ` : targetBranch !== 'main' ? `### 💰 Économie d'API
-            L'analyse IA OpenAI est limitée aux PRs vers \`main\` pour optimiser les coûts.
-            Cette PR vers \`${targetBranch}\` utilise uniquement l'analyse statique.
 
             ` : ''}### 📊 Analyse Statique
 
@@ -151,7 +177,16 @@ jobs:
             ### 📱 Checklist React Native/Expo
             - ✅ Compilation TypeScript vérifiée
             - ✅ Règles ESLint appliquées
-            - ${aiStatus} Analyse IA (${targetBranch === 'main' ? 'activée pour main' : 'économisée pour ' + targetBranch})
+            - ${aiStatus} Analyse IA légère (GPT-4o-mini)
+            - 💡 Pour une review approfondie, mergez vers \`main\` (GPT-4o)
+
+            ### 📜 Historique des Commits (25 derniers)
+            ${commitHistory.slice(0, 10).map(commit => 
+              `- [\`${commit.sha}\`](${commit.url}) ${commit.message} - *${commit.author}* (${new Date(commit.date).toLocaleDateString('fr-FR')})`
+            ).join('\n')}
+            ${commitHistory.length > 10 ? `\n<details><summary>Voir ${commitHistory.length - 10} commits supplémentaires</summary>\n\n${commitHistory.slice(10).map(commit => 
+              `- [\`${commit.sha}\`](${commit.url}) ${commit.message} - *${commit.author}* (${new Date(commit.date).toLocaleDateString('fr-FR')})`
+            ).join('\n')}\n</details>` : ''}
 
             ### 🔗 Ressources
             - [Documentation Expo](https://docs.expo.dev/)
@@ -159,7 +194,8 @@ jobs:
             - [TypeScript Best Practices](https://typescript-eslint.io/rules/)
 
             ---
-            *Review automatique générée par OpenAI GPT-4 & GitHub Actions*`;
+            *Review légère générée par OpenAI GPT-4o-mini & GitHub Actions*
+            *Pour une review approfondie (GPT-4o), créez une PR vers \`main\`*`;
 
             // Post the comment
             await github.rest.issues.createComment({

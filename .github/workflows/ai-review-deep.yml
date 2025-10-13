@@ -1,0 +1,299 @@
+name: 🔴 AI Review Deep (Main)
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    branches:
+      - main # Only run on PRs targeting main (deep review)
+    paths:
+      # Application code
+      - 'app/**/*.ts'
+      - 'app/**/*.tsx'
+      - 'app/**/*.js'
+      - 'app/**/*.jsx'
+      # Components
+      - 'components/**/*.ts'
+      - 'components/**/*.tsx'
+      - 'components/**/*.js'
+      - 'components/**/*.jsx'
+      # Contexts (state management)
+      - 'contexts/**/*.ts'
+      - 'contexts/**/*.tsx'
+      # Hooks
+      - 'hooks/**/*.ts'
+      - 'hooks/**/*.tsx'
+      # Lib (utilities, config)
+      - 'lib/**/*.ts'
+      - 'lib/**/*.tsx'
+      - 'lib/**/*.js'
+      # Constants
+      - 'constants/**/*.ts'
+      - 'constants/**/*.tsx'
+      # Configuration files
+      - 'package.json'
+      - 'tsconfig.json'
+      - 'app.json'
+
+jobs:
+  openai-review:
+    # Optional: Filter by PR author
+    # if: |
+    #   github.event.pull_request.user.login == 'external-contributor' ||
+    #   github.event.pull_request.user.login == 'new-developer' ||
+    #   github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR'
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 30 # Prevent runaway costs
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 50
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Get PR diff and files
+        id: pr-info
+        run: |
+          # Get the diff
+          git fetch origin ${{ github.event.pull_request.base.ref }}
+          git diff origin/${{ github.event.pull_request.base.ref }}...HEAD > pr-diff.txt
+
+          # Get changed files
+          git diff --name-only origin/${{ github.event.pull_request.base.ref }}...HEAD > changed-files.txt
+
+          # Count lines changed
+          LINES_ADDED=$(git diff --numstat origin/${{ github.event.pull_request.base.ref }}...HEAD | awk '{sum+=$1} END {print sum}')
+          LINES_DELETED=$(git diff --numstat origin/${{ github.event.pull_request.base.ref }}...HEAD | awk '{sum+=$2} END {print sum}')
+
+          echo "lines_added=$LINES_ADDED" >> $GITHUB_OUTPUT
+          echo "lines_deleted=$LINES_DELETED" >> $GITHUB_OUTPUT
+
+      - name: Get recent commits
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.TOKEN_GITHUB }}
+          script: |
+            const fs = require('fs');
+
+            // Get commits from this PR
+            const commits = await github.rest.pulls.listCommits({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+            });
+
+            const commitMessages = commits.data.map(c => 
+              `- ${c.commit.message.split('\n')[0]} (${c.commit.author.name})`
+            ).join('\n');
+
+            fs.writeFileSync('pr-commits.txt', commitMessages);
+
+      - name: Run OpenAI Code Review
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.TOKEN_GITHUB }}
+          script: |
+            const fs = require('fs');
+
+            // Read PR information
+            const prDiff = fs.readFileSync('pr-diff.txt', 'utf8');
+            const changedFiles = fs.readFileSync('changed-files.txt', 'utf8').split('\n').filter(f => f);
+            const commitMessages = fs.readFileSync('pr-commits.txt', 'utf8');
+
+            // Limit diff size to avoid token limits
+            const maxDiffLength = 8000;
+            const truncatedDiff = prDiff.length > maxDiffLength 
+              ? prDiff.substring(0, maxDiffLength) + '\n\n... (diff truncated due to size)'
+              : prDiff;
+
+            const prInfo = {
+              number: context.payload.pull_request.number,
+              title: context.payload.pull_request.title,
+              author: context.payload.pull_request.user.login,
+              description: context.payload.pull_request.body || 'No description provided',
+              linesAdded: '${{ steps.pr-info.outputs.lines_added }}',
+              linesDeleted: '${{ steps.pr-info.outputs.lines_deleted }}',
+              filesChanged: changedFiles.length
+            };
+
+            // Prepare OpenAI prompt
+            const systemPrompt = `Tu es un expert senior en React Native, Expo, TypeScript et développement mobile.
+
+            Ton rôle est de faire une review de code approfondie et constructive en français.
+
+            Focus sur:
+            - 🐛 Bugs potentiels et edge cases
+            - 🔒 Problèmes de sécurité
+            - ⚡ Optimisations de performance React Native
+            - 📱 Best practices Expo et React Native
+            - ♿ Accessibilité mobile
+            - 🧪 Suggestions de tests
+            - 🎨 Qualité du code et maintenabilité
+            - 🔄 Gestion d'état et side effects
+
+            Structure ta review avec des sections claires et des emojis.
+            Sois constructif, précis et donne des exemples de code quand pertinent.
+            Utilise des code blocks markdown pour les suggestions de code.`;
+
+            const userPrompt = `# Pull Request à reviewer
+
+            **Repository:** ${{ github.repository }}
+            **PR #${{ github.event.pull_request.number }}:** ${prInfo.title}
+            **Auteur:** ${prInfo.author}
+            **Description:** ${prInfo.description}
+
+            **Statistiques:**
+            - Fichiers modifiés: ${prInfo.filesChanged}
+            - Lignes ajoutées: ${prInfo.linesAdded}
+            - Lignes supprimées: ${prInfo.linesDeleted}
+
+            **Fichiers modifiés:**
+            ${changedFiles.map(f => `- ${f}`).join('\n')}
+
+            **Commits:**
+            ${commitMessages}
+
+            **Diff du code:**
+            \`\`\`diff
+            ${truncatedDiff}
+            \`\`\`
+
+            Fais une review complète et constructive de cette PR.`;
+
+            // Call OpenAI API
+            let reviewContent = '';
+            let tokensUsed = { input: 0, output: 0, total: 0 };
+            let estimatedCost = 0;
+
+            try {
+              const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  model: 'gpt-4o',
+                  messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: userPrompt }
+                  ],
+                  max_tokens: 2000,
+                  temperature: 0.3
+                })
+              });
+              
+              if (!response.ok) {
+                throw new Error(`OpenAI API error: ${response.status} ${response.statusText}`);
+              }
+              
+              const data = await response.json();
+              reviewContent = data.choices[0]?.message?.content || 'Erreur lors de la génération de la review.';
+              
+              // Calculate tokens and cost
+              tokensUsed.input = data.usage?.prompt_tokens || 0;
+              tokensUsed.output = data.usage?.completion_tokens || 0;
+              tokensUsed.total = data.usage?.total_tokens || 0;
+              
+              // GPT-4o pricing (as of 2024): $2.50 per 1M input tokens, $10.00 per 1M output tokens
+              const inputCost = (tokensUsed.input / 1000000) * 2.50;
+              const outputCost = (tokensUsed.output / 1000000) * 10.00;
+              estimatedCost = inputCost + outputCost;
+              
+            } catch (error) {
+              console.error('OpenAI API Error:', error);
+              reviewContent = `❌ **Erreur lors de l'analyse IA**\n\n${error.message}\n\nLa review automatique n'a pas pu être générée.`;
+            }
+
+            // Format the final comment
+            const reviewComment = `# 🤖 OpenAI Code Review (GPT-4o)
+
+            ${reviewContent}
+
+            ---
+
+            ## 💰 Coût de la Review
+
+            | Métrique | Valeur |
+            |----------|--------|
+            | 📥 Tokens d'entrée | ${tokensUsed.input.toLocaleString()} |
+            | 📤 Tokens de sortie | ${tokensUsed.output.toLocaleString()} |
+            | 📊 Total tokens | ${tokensUsed.total.toLocaleString()} |
+            | 💵 Coût estimé | $${estimatedCost.toFixed(4)} USD |
+
+            **Modèle utilisé:** GPT-4o
+
+            ---
+
+            ## 📋 Informations PR
+
+            - **Fichiers modifiés:** ${prInfo.filesChanged}
+            - **Lignes ajoutées:** +${prInfo.linesAdded}
+            - **Lignes supprimées:** -${prInfo.linesDeleted}
+            - **Auteur:** @${prInfo.author}
+
+            ---
+
+            *Review automatique générée par OpenAI GPT-4o via GitHub Actions*
+            *Pour des questions ou suggestions, consultez [CLAUDE.md](./CLAUDE.md) pour les conventions du projet*`;
+
+            // Post the review comment
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: reviewComment
+            });
+
+            // Add labels based on review content
+            const labels = ['ai-review', 'openai'];
+            if (reviewContent.toLowerCase().includes('bug')) labels.push('potential-bug');
+            if (reviewContent.toLowerCase().includes('sécurité') || reviewContent.toLowerCase().includes('security')) labels.push('security');
+            if (reviewContent.toLowerCase().includes('performance')) labels.push('performance');
+            if (reviewContent.toLowerCase().includes('test')) labels.push('needs-tests');
+
+            try {
+              await github.rest.issues.addLabels({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                labels: labels
+              });
+            } catch (error) {
+              console.log('Could not add labels:', error.message);
+            }
+
+            // Add to job summary
+            core.summary
+              .addHeading('🤖 OpenAI Code Review Summary', 2)
+              .addTable([
+                [{data: 'Métrique', header: true}, {data: 'Valeur', header: true}],
+                ['Tokens utilisés', tokensUsed.total.toLocaleString()],
+                ['Coût estimé', `$${estimatedCost.toFixed(4)} USD`],
+                ['Fichiers analysés', prInfo.filesChanged.toString()],
+                ['Lignes modifiées', `+${prInfo.linesAdded} / -${prInfo.linesDeleted}`]
+              ])
+              .write();
+
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+      - name: Display Cost Summary
+        if: always()
+        run: |
+          echo "## 💰 OpenAI Code Review Cost Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Review completed - Check the PR comment for detailed analysis and cost breakdown" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Model:** GPT-4o" >> $GITHUB_STEP_SUMMARY
+          echo "**Target Branch:** staging" >> $GITHUB_STEP_SUMMARY
