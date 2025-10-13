@@ -4,8 +4,8 @@ import * as WebBrowser from 'expo-web-browser';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 
-import { supabase } from '@/lib/supabase';
 import { getAuthRedirectUri } from '@/lib/auth-config';
+import { supabase } from '@/lib/supabase';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -15,7 +15,10 @@ type AuthContextType = {
   isLoading: boolean;
   signInWithGoogle: () => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
-  signUpWithEmail: (email: string, password: string) => Promise<void>;
+  signUpWithEmail: (
+    email: string,
+    password: string
+  ) => Promise<{ user: User | null; session: Session | null } | undefined>;
   signOut: () => Promise<void>;
 };
 
