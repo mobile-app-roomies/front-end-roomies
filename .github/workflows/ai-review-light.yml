@@ -51,14 +51,14 @@ jobs:
           github-token: ${{ secrets.TOKEN_GITHUB }}
           script: |
             const fs = require('fs');
-            
+
             // Récupérer les 25 derniers commits
             const commits = await github.rest.repos.listCommits({
               owner: context.repo.owner,
               repo: context.repo.repo,
               per_page: 25
             });
-            
+
             // Formater l'historique
             const commitHistory = commits.data.map(commit => ({
               sha: commit.sha.substring(0, 7),
@@ -67,10 +67,10 @@ jobs:
               message: commit.commit.message.split('\n')[0],
               url: commit.html_url
             }));
-            
+
             // Sauvegarder dans un fichier
             fs.writeFileSync('commit-history.json', JSON.stringify(commitHistory, null, 2));
-            
+
             console.log(`✅ Récupéré ${commitHistory.length} commits`);
 
       - name: Generate AI Code Review
