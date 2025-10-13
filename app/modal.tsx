@@ -6,7 +6,7 @@ export default function ModalScreen() {
   return (
     <View style={styles.container}>
       <Text variant="title" weight="bold">
-        Modal superCours
+        Modal superCours coucou
       </Text>
       <Spacer size="lg" />
       <Link href="/" dismissTo asChild>
