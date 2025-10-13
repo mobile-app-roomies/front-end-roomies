@@ -61,7 +61,7 @@ jobs:
             --base staging \
             --head "$BRANCH_NAME"
         env:
-          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Add labels to PR
         if: steps.check-pr.outputs.existing-pr == ''
@@ -73,15 +73,15 @@ jobs:
 
           # Add labels based on branch name
           if [[ "$BRANCH_NAME" =~ ^feat/ ]]; then
-            gh pr edit "$PR_NUMBER" --add-label "feature"
+            gh pr edit "$PR_NUMBER" --add-label "feature" || true
           elif [[ "$BRANCH_NAME" =~ ^fix/ ]]; then
-            gh pr edit "$PR_NUMBER" --add-label "bugfix"
+            gh pr edit "$PR_NUMBER" --add-label "bugfix" || true
           elif [[ "$BRANCH_NAME" =~ ^refactor/ ]]; then
-            gh pr edit "$PR_NUMBER" --add-label "refactor"
+            gh pr edit "$PR_NUMBER" --add-label "refactor" || true
           elif [[ "$BRANCH_NAME" =~ ^chore/ ]]; then
-            gh pr edit "$PR_NUMBER" --add-label "chore"
+            gh pr edit "$PR_NUMBER" --add-label "chore" || true
           fi
 
-          gh pr edit "$PR_NUMBER" --add-label "auto-generated"
+          gh pr edit "$PR_NUMBER" --add-label "auto-generated" || true
         env:
-          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

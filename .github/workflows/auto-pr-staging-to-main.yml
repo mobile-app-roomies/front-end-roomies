@@ -26,7 +26,7 @@ jobs:
           EXISTING_PR=$(gh pr list --head staging --base main --json number --jq '.[0].number // empty')
           echo "existing-pr=$EXISTING_PR" >> $GITHUB_OUTPUT
         env:
-          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Get latest commits for PR body
         id: get-commits
@@ -42,7 +42,7 @@ jobs:
           COMMIT_COUNT=$(gh api repos/${{ github.repository }}/compare/main...staging --jq '.commits | length')
           echo "commit-count=$COMMIT_COUNT" >> $GITHUB_OUTPUT
         env:
-          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create Pull Request to Main
         if: steps.check-pr.outputs.existing-pr == ''
@@ -75,7 +75,7 @@ jobs:
             --base main \
             --head staging
         env:
-          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Add labels and assign reviewers
         if: steps.check-pr.outputs.existing-pr == ''
@@ -91,7 +91,7 @@ jobs:
           # Set as ready for review
           gh pr ready "$PR_NUMBER" || true
         env:
-          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Update existing PR
         if: steps.check-pr.outputs.existing-pr != ''
@@ -128,4 +128,4 @@ jobs:
           ---
           *This PR was automatically updated. Use **merge commit** to preserve history.*"
         env:
-          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
