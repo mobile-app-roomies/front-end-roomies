@@ -19,3 +19,7 @@ web-build
 # Ignore configuration files
 package-lock.json
 yarn.lock
+
+# Ignore GitHub workflows (YAML with inline scripts)
+.github/workflows/*.yml
+.github/workflows/*.yaml
