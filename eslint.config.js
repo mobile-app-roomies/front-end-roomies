@@ -9,4 +9,20 @@ module.exports = defineConfig([
   {
     ignores: ['dist/*', 'node_modules/*', '.expo/*', 'web-build/*'],
   },
+  {
+    files: ['**/__tests__/**/*', '**/*.test.*', '**/*.spec.*', 'jest.setup.js', 'jest.config.js'],
+    languageOptions: {
+      globals: {
+        jest: 'readonly',
+        describe: 'readonly',
+        it: 'readonly',
+        expect: 'readonly',
+        beforeEach: 'readonly',
+        afterEach: 'readonly',
+        beforeAll: 'readonly',
+        afterAll: 'readonly',
+        test: 'readonly',
+      },
+    },
+  },
 ]);
