@@ -3,12 +3,17 @@ name: 🤖 AI Code Review
 on:
   pull_request:
     types: [opened, synchronize]
-    branches: [main]
+    branches: [staging]
     paths:
       - '**.ts'
       - '**.tsx'
       - '**.js'
       - '**.jsx'
+
+# Prevent concurrent reviews on the same PR
+concurrency:
+  group: ai-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 jobs:
   ai-review:
