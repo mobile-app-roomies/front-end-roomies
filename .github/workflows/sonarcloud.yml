@@ -2,13 +2,20 @@ name: SonarCloud Scan
 
 on:
   push:
-    branches:
-      - 'main'
-      - 'staging'
+    branches: [main, staging]
+    paths:
+      - '**.js'
+      - '**.jsx'
+      - '**.ts'
+      - '**.tsx'
+      - 'package*.json'
+      - 'sonar-project.properties'
+  workflow_dispatch:
 
 jobs:
   sonarcloud:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
       pull-requests: write
