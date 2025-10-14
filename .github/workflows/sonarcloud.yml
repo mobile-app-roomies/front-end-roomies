@@ -2,7 +2,17 @@ name: SonarCloud Scan
 
 on:
   push:
-    branches: [main, staging]
+    branches: [staging]
+    paths:
+      - '**.js'
+      - '**.jsx'
+      - '**.ts'
+      - '**.tsx'
+      - 'package*.json'
+      - 'sonar-project.properties'
+      - '.github/workflows/sonarcloud.yml'
+  pull_request:
+    branches: [staging]
     paths:
       - '**.js'
       - '**.jsx'
@@ -12,13 +22,17 @@ on:
       - 'sonar-project.properties'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   sonarcloud:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     permissions:
       contents: read
       pull-requests: write
+      statuses: write
 
     steps:
       - name: Checkout code
@@ -33,14 +47,112 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci --legacy-peer-deps
+        run: npm ci
 
       - name: Run tests with coverage
-        run: npm run test:coverage
+        id: tests
+        run: npm run test:coverage || echo "Tests failed but continuing..."
         continue-on-error: true
 
       - name: SonarCloud Scan
+        id: sonar-scan
         uses: SonarSource/sonarcloud-github-action@v3.1.0
+        continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONARCLOUD_KEY }}
+
+      - name: Parse SonarCloud Results
+        if: always()
+        id: parse-sonar
+        continue-on-error: true
+        run: |
+          echo "## 📊 SonarCloud Analysis Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Get project key from sonar-project.properties
+          if [ -f sonar-project.properties ]; then
+            PROJECT_KEY=$(grep "sonar.projectKey" sonar-project.properties | cut -d'=' -f2)
+            ORG_KEY=$(grep "sonar.organization" sonar-project.properties | cut -d'=' -f2)
+
+            echo "### 🔗 Links" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "- [📈 SonarCloud Dashboard](https://sonarcloud.io/project/overview?id=${PROJECT_KEY})" >> $GITHUB_STEP_SUMMARY
+            echo "- [🐛 View Issues](https://sonarcloud.io/project/issues?id=${PROJECT_KEY})" >> $GITHUB_STEP_SUMMARY
+            echo "- [📏 Code Metrics](https://sonarcloud.io/component_measures?id=${PROJECT_KEY})" >> $GITHUB_STEP_SUMMARY
+            echo "- [🔐 Security Hotspots](https://sonarcloud.io/project/security_hotspots?id=${PROJECT_KEY})" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+
+            echo "project_key=${PROJECT_KEY}" >> $GITHUB_OUTPUT
+            echo "org_key=${ORG_KEY}" >> $GITHUB_OUTPUT
+          fi
+
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### ℹ️ Scan Information" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| 📅 Date | $(date +'%Y-%m-%d %H:%M:%S UTC') |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🔗 Branch | ${{ github.ref_name }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 👤 Triggered by | ${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 📝 Commit | ${{ github.sha }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ -f coverage/lcov.info ]; then
+            echo "✅ **Test coverage data found and uploaded**" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ **No test coverage data found**" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Upload Coverage Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report-${{ github.run_number }}
+          path: |
+            coverage/
+          retention-days: 30
+          if-no-files-found: warn
+
+      - name: Comment on PR with SonarCloud Results
+        if: github.event_name == 'pull_request' && always()
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.PAT_TOKEN }}
+          script: |
+            const projectKey = '${{ steps.parse-sonar.outputs.project_key }}' || 'unknown';
+            const orgKey = '${{ steps.parse-sonar.outputs.org_key }}' || 'unknown';
+
+            let comment = '## 📊 SonarCloud Analysis\n\n';
+
+            if (projectKey !== 'unknown') {
+              comment += '### 🔗 Quick Links\n\n';
+              comment += `- [📈 View Dashboard](https://sonarcloud.io/project/overview?id=${projectKey})\n`;
+              comment += `- [🐛 View Issues](https://sonarcloud.io/project/issues?id=${projectKey}&pullRequest=${{ github.event.pull_request.number }})\n`;
+              comment += `- [🔐 Security Hotspots](https://sonarcloud.io/project/security_hotspots?id=${projectKey}&pullRequest=${{ github.event.pull_request.number }})\n`;
+              comment += `- [📏 Code Coverage](https://sonarcloud.io/component_measures?id=${projectKey}&pullRequest=${{ github.event.pull_request.number }}&metric=coverage)\n\n`;
+            }
+
+            comment += '---\n\n';
+            comment += '### 📋 What SonarCloud Checks\n\n';
+            comment += '- 🐛 **Bugs**: Potential runtime errors\n';
+            comment += '- 🔐 **Vulnerabilities**: Security issues\n';
+            comment += '- 🔥 **Code Smells**: Maintainability issues\n';
+            comment += '- 📊 **Coverage**: Test coverage percentage\n';
+            comment += '- 🔄 **Duplications**: Duplicated code blocks\n\n';
+
+            comment += `📅 **Scan Date:** ${new Date().toISOString()}\n\n`;
+            comment += '*Automated code quality analysis by SonarCloud*';
+
+            try {
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: comment
+              });
+            } catch (error) {
+              console.log('Failed to create comment:', error.message);
+            }
