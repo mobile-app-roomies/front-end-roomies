@@ -1,0 +1,417 @@
+name: 🔒 Snyk Security Analysis
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - main
+      - staging
+    paths-ignore:
+      - '**.md'
+      - '.github/workflows/**'
+      - 'docs/**'
+      - '.gitignore'
+      - '.prettierrc'
+      - '.eslintignore'
+      - 'LICENSE'
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to run security scan on'
+        required: false
+        default: 'current branch'
+      force_scan:
+        description: 'Force full scan even if no changes detected'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  snyk-security-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write
+      pull-requests: write
+      issues: write
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🔍 Check for relevant changes
+        id: check-changes
+        if: github.event_name == 'pull_request'
+        run: |
+          echo "Checking for relevant changes..."
+
+          # Get list of changed files in PR
+          CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD 2>/dev/null || git diff --name-only HEAD~1 2>/dev/null || echo "")
+
+          # Check if any relevant files changed
+          RELEVANT_CHANGES=false
+
+          # Check for package changes
+          if echo "$CHANGED_FILES" | grep -qE "(package\.json|package-lock\.json|yarn\.lock|pnpm-lock\.yaml)"; then
+            echo "📦 Package files changed - scan needed"
+            RELEVANT_CHANGES=true
+          fi
+
+          # Check for code changes
+          if echo "$CHANGED_FILES" | grep -qE "\.(js|jsx|ts|tsx|mjs|cjs)$"; then
+            echo "📝 Code files changed - scan needed"
+            RELEVANT_CHANGES=true
+          fi
+
+          # Check for config changes that might affect security
+          if echo "$CHANGED_FILES" | grep -qE "(\.env|config|tsconfig|babel\.config|webpack\.config)"; then
+            echo "⚙️ Config files changed - scan needed"
+            RELEVANT_CHANGES=true
+          fi
+
+          echo "relevant_changes=$RELEVANT_CHANGES" >> $GITHUB_OUTPUT
+
+          if [ "$RELEVANT_CHANGES" = "false" ]; then
+            echo "ℹ️ No security-relevant changes detected in this PR"
+          fi
+
+      - name: 📊 Skip scan message
+        if: github.event_name == 'pull_request' && steps.check-changes.outputs.relevant_changes == 'false' && github.event.inputs.force_scan != 'true'
+        run: |
+          echo "## ℹ️ Snyk Security Scan Skipped" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "No security-relevant files were modified in this PR." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Files that trigger security scans:**" >> $GITHUB_STEP_SUMMARY
+          echo "- Package files: \`package.json\`, \`package-lock.json\`, \`yarn.lock\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Code files: \`*.js\`, \`*.jsx\`, \`*.ts\`, \`*.tsx\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Config files: \`.env\`, \`*config*\`, \`tsconfig.json\`, etc." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "To force a scan, you can:" >> $GITHUB_STEP_SUMMARY
+          echo "1. Run the workflow manually from Actions tab" >> $GITHUB_STEP_SUMMARY
+          echo "2. Add the \`force_scan\` parameter when triggering via API" >> $GITHUB_STEP_SUMMARY
+
+      - name: 💬 Comment on PR - Scan Skipped
+        if: github.event_name == 'pull_request' && steps.check-changes.outputs.relevant_changes == 'false' && github.event.inputs.force_scan != 'true'
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
+          script: |
+            const comment = `## ℹ️ Snyk Security Scan Skipped
+
+            No security-relevant files were modified in this PR, so the security scan was skipped to save resources.
+
+            **Modified files that would trigger a scan:**
+            - Package management: \`package.json\`, \`package-lock.json\`, \`yarn.lock\`
+            - Source code: \`*.js\`, \`*.jsx\`, \`*.ts\`, \`*.tsx\`
+            - Configuration: \`.env\`, config files, etc.
+
+            If you need to run a security scan anyway, you can:
+            - Trigger the workflow manually from the [Actions tab](https://github.com/${{ github.repository }}/actions)
+            - Push a commit that modifies security-relevant files
+
+            *This is an optimization to reduce unnecessary scans on documentation or styling changes.*`;
+
+            try {
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: comment
+              });
+            } catch (error) {
+              console.log('Failed to create skip comment:', error.message);
+            }
+
+      - name: 🔧 Setup Node.js
+        if: steps.check-changes.outputs.relevant_changes != 'false' || github.event_name == 'workflow_dispatch' || github.event.inputs.force_scan == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        if: steps.check-changes.outputs.relevant_changes != 'false' || github.event_name == 'workflow_dispatch' || github.event.inputs.force_scan == 'true'
+        run: npm ci
+
+      - name: 🔍 Setup Snyk
+        if: steps.check-changes.outputs.relevant_changes != 'false' || github.event_name == 'workflow_dispatch' || github.event.inputs.force_scan == 'true'
+        uses: snyk/actions/setup@master
+
+      - name: 🛡️ Snyk Test - Vulnerabilities Scan
+        id: snyk-test
+        if: steps.check-changes.outputs.relevant_changes != 'false' || github.event_name == 'workflow_dispatch' || github.event.inputs.force_scan == 'true'
+        continue-on-error: true
+        run: |
+          # Run test and capture exit code
+          snyk test --json > snyk-test-results.json 2>&1 || echo "SNYK_TEST_EXIT_CODE=$?" >> $GITHUB_ENV
+
+          # Generate SARIF if JSON was created successfully
+          if [ -f snyk-test-results.json ] && [ -s snyk-test-results.json ]; then
+            snyk test --sarif-file-output=snyk-test-results.sarif 2>/dev/null || true
+          fi
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+      - name: 🔐 Snyk Code - Static Application Security Testing (SAST)
+        id: snyk-code
+        if: steps.check-changes.outputs.relevant_changes != 'false' || github.event_name == 'workflow_dispatch' || github.event.inputs.force_scan == 'true'
+        continue-on-error: true
+        run: |
+          # Run code test and capture exit code
+          snyk code test --json > snyk-code-results.json 2>&1 || echo "SNYK_CODE_EXIT_CODE=$?" >> $GITHUB_ENV
+
+          # Generate SARIF if JSON was created successfully
+          if [ -f snyk-code-results.json ] && [ -s snyk-code-results.json ]; then
+            snyk code test --sarif-file-output=snyk-code-results.sarif 2>/dev/null || true
+          fi
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+      - name: 🌐 Snyk Monitor - Continuous Monitoring
+        continue-on-error: true
+        run: |
+          if [ -n "${{ secrets.SNYK_ORG_ID }}" ]; then
+            snyk monitor --project-name="${{ github.repository }}" --org="${{ secrets.SNYK_ORG_ID }}" || echo "⚠️ Monitoring failed"
+          else
+            snyk monitor --project-name="${{ github.repository }}" || echo "⚠️ Monitoring failed (no org specified)"
+          fi
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+      - name: 📊 Install snyk-to-html
+        run: npm install -g snyk-to-html
+
+      - name: 📄 Generate HTML Report - Vulnerabilities
+        if: always()
+        run: |
+          if [ -f snyk-test-results.json ] && [ -s snyk-test-results.json ]; then
+            snyk-to-html -i snyk-test-results.json -o snyk-vulnerabilities-report.html || echo "⚠️ No vulnerabilities report generated"
+          else
+            echo "⚠️ No test results found or file is empty"
+            echo "<html><body><h1>No vulnerability scan results available</h1></body></html>" > snyk-vulnerabilities-report.html
+          fi
+
+      - name: 📄 Generate HTML Report - Code Issues
+        if: always()
+        run: |
+          if [ -f snyk-code-results.json ] && [ -s snyk-code-results.json ]; then
+            snyk-to-html -i snyk-code-results.json -o snyk-code-report.html || echo "⚠️ No code report generated"
+          else
+            echo "⚠️ No code results found or file is empty"
+            echo "<html><body><h1>No code scan results available</h1></body></html>" > snyk-code-report.html
+          fi
+
+      - name: 📈 Parse Results and Create Summary
+        if: always()
+        id: parse-results
+        run: |
+          echo "## 🔒 Snyk Security Analysis Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Initialize counters
+          CRITICAL=0
+          HIGH=0
+          MEDIUM=0
+          LOW=0
+
+          # Parse vulnerabilities - handle both success and error cases
+          if [ -f snyk-test-results.json ] && [ -s snyk-test-results.json ]; then
+            # Check if it's an error response or actual results
+            if jq -e '.vulnerabilities' snyk-test-results.json > /dev/null 2>&1; then
+              CRITICAL=$(jq '[.vulnerabilities[]? | select(.severity=="critical")] | length' snyk-test-results.json 2>/dev/null || echo "0")
+              HIGH=$(jq '[.vulnerabilities[]? | select(.severity=="high")] | length' snyk-test-results.json 2>/dev/null || echo "0")
+              MEDIUM=$(jq '[.vulnerabilities[]? | select(.severity=="medium")] | length' snyk-test-results.json 2>/dev/null || echo "0")
+              LOW=$(jq '[.vulnerabilities[]? | select(.severity=="low")] | length' snyk-test-results.json 2>/dev/null || echo "0")
+            elif jq -e '.error' snyk-test-results.json > /dev/null 2>&1; then
+              echo "⚠️ **Snyk Test Error:** $(jq -r '.error' snyk-test-results.json)" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
+
+          echo "### 🛡️ Dependency Vulnerabilities" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Severity | Count |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| 🔴 Critical | $CRITICAL |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🟠 High | $HIGH |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🟡 Medium | $MEDIUM |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🟢 Low | $LOW |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "critical=$CRITICAL" >> $GITHUB_OUTPUT
+          echo "high=$HIGH" >> $GITHUB_OUTPUT
+          echo "medium=$MEDIUM" >> $GITHUB_OUTPUT
+          echo "low=$LOW" >> $GITHUB_OUTPUT
+
+          # Initialize code counters
+          CODE_CRITICAL=0
+          CODE_HIGH=0
+          CODE_MEDIUM=0
+
+          # Parse code issues - handle both SARIF and standard format
+          if [ -f snyk-code-results.json ] && [ -s snyk-code-results.json ]; then
+            # Check if it's SARIF format
+            if jq -e '.runs[0].results' snyk-code-results.json > /dev/null 2>&1; then
+              CODE_CRITICAL=$(jq '[.runs[0].results[]? | select(.level=="error")] | length' snyk-code-results.json 2>/dev/null || echo "0")
+              CODE_HIGH=$(jq '[.runs[0].results[]? | select(.level=="warning")] | length' snyk-code-results.json 2>/dev/null || echo "0")
+              CODE_MEDIUM=$(jq '[.runs[0].results[]? | select(.level=="note")] | length' snyk-code-results.json 2>/dev/null || echo "0")
+            # Check if it's standard Snyk format
+            elif jq -e '.runs' snyk-code-results.json > /dev/null 2>&1; then
+              # Try alternative structure
+              CODE_CRITICAL=$(jq '[.. | .results?[]? | select(.level=="error")] | length' snyk-code-results.json 2>/dev/null || echo "0")
+              CODE_HIGH=$(jq '[.. | .results?[]? | select(.level=="warning")] | length' snyk-code-results.json 2>/dev/null || echo "0")
+              CODE_MEDIUM=$(jq '[.. | .results?[]? | select(.level=="note")] | length' snyk-code-results.json 2>/dev/null || echo "0")
+            elif jq -e '.error' snyk-code-results.json > /dev/null 2>&1; then
+              echo "⚠️ **Snyk Code Error:** $(jq -r '.error' snyk-code-results.json)" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
+
+          echo "### 🔐 Code Security Issues (SAST)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Severity | Count |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| 🔴 Error | $CODE_CRITICAL |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🟠 Warning | $CODE_HIGH |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🟡 Note | $CODE_MEDIUM |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "code_critical=$CODE_CRITICAL" >> $GITHUB_OUTPUT
+          echo "code_high=$CODE_HIGH" >> $GITHUB_OUTPUT
+          echo "code_medium=$CODE_MEDIUM" >> $GITHUB_OUTPUT
+
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📊 Rapports Détaillés" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "📄 **Rapports HTML disponibles dans les artifacts:**" >> $GITHUB_STEP_SUMMARY
+          echo "- [Télécharger les rapports](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "🔍 **Consultez aussi:**" >> $GITHUB_STEP_SUMMARY
+          echo "- [GitHub Security Tab](https://github.com/${{ github.repository }}/security/code-scanning)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "📅 **Date:** $(date +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "🔗 **Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "👤 **Triggered by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+
+      - name: 📤 Upload HTML Reports as Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: snyk-security-reports-${{ github.run_number }}
+          path: |
+            snyk-vulnerabilities-report.html
+            snyk-code-report.html
+            snyk-test-results.json
+            snyk-code-results.json
+            snyk-test-results.sarif
+            snyk-code-results.sarif
+          retention-days: 30
+          if-no-files-found: warn
+
+      - name: 📤 Upload SARIF to GitHub Security
+        if: always()
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: snyk-test-results.sarif
+          category: snyk-vulnerabilities
+          wait-for-processing: false
+
+      - name: 📤 Upload Code SARIF to GitHub Security
+        if: always()
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: snyk-code-results.sarif
+          category: snyk-code
+          wait-for-processing: false
+
+      - name: 💬 Comment on PR with Results
+        if: github.event_name == 'pull_request' && always()
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+
+            let comment = '## 🔒 Snyk Security Analysis\n\n';
+
+            // Parse environment variables with fallback
+            const critical = '${{ steps.parse-results.outputs.critical }}' || '0';
+            const high = '${{ steps.parse-results.outputs.high }}' || '0';
+            const medium = '${{ steps.parse-results.outputs.medium }}' || '0';
+            const low = '${{ steps.parse-results.outputs.low }}' || '0';
+
+            const codeCritical = '${{ steps.parse-results.outputs.code_critical }}' || '0';
+            const codeHigh = '${{ steps.parse-results.outputs.code_high }}' || '0';
+            const codeMedium = '${{ steps.parse-results.outputs.code_medium }}' || '0';
+
+            // Vulnerabilities
+            comment += '### 🛡️ Dependency Vulnerabilities\n\n';
+            comment += '| Severity | Count |\n';
+            comment += '|----------|-------|\n';
+            comment += `| 🔴 Critical | ${critical} |\n`;
+            comment += `| 🟠 High | ${high} |\n`;
+            comment += `| 🟡 Medium | ${medium} |\n`;
+            comment += `| 🟢 Low | ${low} |\n\n`;
+
+            if (parseInt(critical) > 0 || parseInt(high) > 0) {
+              comment += '⚠️ **Action Required:** Critical or High vulnerabilities detected!\n\n';
+            }
+
+            // Code Issues
+            comment += '### 🔐 Code Security Issues (SAST)\n\n';
+            comment += '| Severity | Count |\n';
+            comment += '|----------|-------|\n';
+            comment += `| 🔴 Error | ${codeCritical} |\n`;
+            comment += `| 🟠 Warning | ${codeHigh} |\n`;
+            comment += `| 🟡 Note | ${codeMedium} |\n\n`;
+
+            comment += '---\n\n';
+            comment += '### 📊 Rapports Détaillés\n\n';
+            comment += '📄 **Rapports HTML disponibles:**\n';
+            comment += `- [📥 Télécharger les rapports (artifacts)](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})\n`;
+            comment += `- \`snyk-vulnerabilities-report.html\` - Vulnérabilités des dépendances\n`;
+            comment += `- \`snyk-code-report.html\` - Problèmes de sécurité du code\n\n`;
+            comment += '🔍 **Autres ressources:**\n';
+            comment += `- [GitHub Security Tab](https://github.com/${{ github.repository }}/security/code-scanning)\n`;
+            comment += `- [Workflow Run Details](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})\n\n`;
+            comment += `📅 **Scan Date:** ${new Date().toISOString()}\n\n`;
+            comment += '*Automated security scan by Snyk*';
+
+            try {
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: comment
+              });
+            } catch (error) {
+              console.log('Failed to create comment:', error.message);
+            }
+
+      - name: ❌ Fail on Critical Vulnerabilities
+        if: steps.parse-results.outputs.critical > 0
+        run: |
+          echo "::error::🔴 Critical vulnerabilities detected! Count: ${{ steps.parse-results.outputs.critical }}"
+          echo "Please review the security report and fix critical vulnerabilities before merging."
+          exit 1
+
+      - name: ⚠️ Warning on High Vulnerabilities
+        if: steps.parse-results.outputs.high > 0 && steps.parse-results.outputs.critical == 0
+        run: |
+          echo "::warning::🟠 High severity vulnerabilities detected! Count: ${{ steps.parse-results.outputs.high }}"
+          echo "Consider fixing these vulnerabilities before merging."
+
+      - name: ✅ Security Check Passed
+        if: steps.parse-results.outputs.critical == 0 && steps.parse-results.outputs.high == 0
+        run: |
+          echo "✅ No critical or high severity vulnerabilities detected!"
+          echo "Security scan completed successfully."
